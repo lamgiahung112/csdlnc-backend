@@ -1,47 +1,58 @@
 package addb.project;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import addb.project.model.StockSnapshot;
-import addb.project.model.request.GetStocksRequest;
-import addb.project.utilities.StockSnapshotMatcher;
+import addb.project.config.DatabaseConfig;
+import addb.project.model.Product;
+import addb.project.model.request.GetProductRequest;
+import addb.project.model.request.UpdateProductRequest;
+import addb.project.utilities.ProductMatcher;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
 public class DataService {
-	@Autowired Configuration conf;
-	@Autowired HBaseAdmin admin;
-	
-	public List<StockSnapshot> getSnapshots(GetStocksRequest request) {
-		List<StockSnapshot> snapshots = new ArrayList<>();
-		try (HTable table = new HTable(conf, "GOOGLE")) {
+	public List<Product> getSnapshots(GetProductRequest request) {
+		List<Product> snapshots = new ArrayList<>();
+		try (Table table = DatabaseConfig.CONN().getTable(TableName.valueOf("PRODUCTS"))) {
 			Scan scan = new Scan();
 			ResultScanner scanner = table.getScanner(scan);
+			int count = 0;
 			
 			for (Result result : scanner) {
-				StockSnapshot snapshot = StockSnapshot.fromResult(result);
+				Product snapshot = Product.fromResult(result);
 				if (snapshots.size() == request.getPageSize()) {
 					break;
 				}
 				// Ignore non-matches
-				if (!StockSnapshotMatcher.matches(snapshot, request)) {
+				if (!ProductMatcher.matches(snapshot, request)) {
+					continue;
+				}
+				if (count < (request.getPage()-1)*request.getPageSize()) {
+					count++;
 					continue;
 				}
 				snapshots.add(snapshot);
@@ -53,38 +64,37 @@ public class DataService {
 		}
 	}
 	
-	public void readAndAddSnapshotsFromFile(MultipartFile file) {
-		if (file == null || file.isEmpty()) {
-			return;
+	public void handleUpdateProduct(MultipartFile file, UpdateProductRequest request) {
+		if (file != null && !file.isEmpty()) {
+			try (FileInputStream inp = (FileInputStream) file.getInputStream()) {
+				String path = "/backend/src/main/resources/public/" + request.getId() + ".jpg";
+				File savedFile = new File(path);
+				if (savedFile.exists()) {
+					savedFile.delete();
+				}
+				FileOutputStream out = new FileOutputStream(savedFile);
+				out.write(inp.readAllBytes());
+				out.close();
+				inp.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 		
-		try(BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream())); 
-	    		  HTable table = new HTable(conf, "GOOGLE")) {
-			int count = 0;
-			String line;
-	    	 while ((line = reader.readLine()) != null) {
-	    		 String[] data = line.split(",");
-	    		 String date = data[0];
-	    		 double open = Double.parseDouble(data[1]);
-	    		 double high = Double.parseDouble(data[2]);
-	    		 double low = Double.parseDouble(data[3]);
-	    		 double close = Double.parseDouble(data[4]);
-	    		 double adjClose = Double.parseDouble(data[5]);
-	    		 double volume = Double.parseDouble(data[6]);
-	    		 
-	    		 Put put = new Put(Bytes.toBytes(date));
-	    		 
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "open".getBytes(), Bytes.toBytes(open));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "high".getBytes(), Bytes.toBytes(high));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "low".getBytes(), Bytes.toBytes(low));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "close".getBytes(), Bytes.toBytes(close));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "adjClose".getBytes(), Bytes.toBytes(adjClose));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "volume".getBytes(), Bytes.toBytes(volume));
-	    		 
-	    		 table.put(put);
-	    		 count++;
-	    	 }
-	    	 log.info("Added " + count + " snapshots");
+		try(Table table = DatabaseConfig.CONN().getTable(TableName.valueOf("PRODUCTS"))) {
+			 Put put = new Put(Bytes.toBytes(request.getId()));
+   		 
+	   		 put.addColumn("ID".getBytes(), "gender".getBytes(), Bytes.toBytes(request.getGender()));
+	   		 put.addColumn("ID".getBytes(), "masterCategory".getBytes(), Bytes.toBytes(request.getMasterCategory()));
+	   		 put.addColumn("ID".getBytes(), "subCategory".getBytes(), Bytes.toBytes(request.getSubCategory()));
+	   		 put.addColumn("ID".getBytes(), "articleType".getBytes(), Bytes.toBytes(request.getArticleType()));
+	   		 put.addColumn("ID".getBytes(), "baseColour".getBytes(), Bytes.toBytes(request.getBaseColour()));
+	   		 put.addColumn("ID".getBytes(), "season".getBytes(), Bytes.toBytes(request.getSeason()));
+	   		 put.addColumn("ID".getBytes(), "year".getBytes(), Bytes.toBytes(request.getYear()));
+	   		 put.addColumn("ID".getBytes(), "usage".getBytes(), Bytes.toBytes(request.getUsage()));
+	   		 put.addColumn("ID".getBytes(), "productDisplayName".getBytes(), Bytes.toBytes(request.getProductDisplayName()));
+	   		 
+	   		 table.put(put);
 	      } catch(Exception e) {
 	    	  e.printStackTrace();
 	    	  log.info(e.getMessage());

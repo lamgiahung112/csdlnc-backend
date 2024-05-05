@@ -10,6 +10,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -18,6 +19,7 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -27,16 +29,11 @@ import lombok.extern.slf4j.Slf4j;
 @org.springframework.context.annotation.Configuration
 @Slf4j
 public class DatabaseConfigInitializer {
-	@Autowired
-	private Configuration conf;
-	@Autowired
-	private HBaseAdmin admin;
-	
 	public void init() {
 		try {
 			setupTableAndColumn();
-			deleteAllData();
-			addData();
+//			deleteAllData();
+//			addData();
 			
 			log.info("Database config initilialized!");
 		} catch (Exception e) {
@@ -47,11 +44,11 @@ public class DatabaseConfigInitializer {
 	private void setupTableAndColumn() {
 		try {
 			// Create table and column family
-		      HTableDescriptor table = new HTableDescriptor("GOOGLE");
-		      HColumnDescriptor column = new HColumnDescriptor("STOCK_PRICES");
+		      HTableDescriptor table = new HTableDescriptor(TableName.valueOf("PRODUCTS"));
+		      HColumnDescriptor column = new HColumnDescriptor("ID");
 		      table.addFamily(column);
 		      
-		      admin.createTable(table);
+		      DatabaseConfig.ADMIN().createTable(table);
 		      
 		      log.info("CREATED table GOOGLE");
 		      log.info("CREATED column STOCK_PRICES");
@@ -61,7 +58,7 @@ public class DatabaseConfigInitializer {
 	}
 	
 	private void deleteAllData() throws IOException {
-		try (HTable table = new HTable(conf, "GOOGLE")) {
+		try (Table table = DatabaseConfig.CONN().getTable(TableName.valueOf("GOOGLE"))) {
 			Scan scan = new Scan();
 			ResultScanner scanner = table.getScanner(scan);
 			
@@ -75,36 +72,42 @@ public class DatabaseConfigInitializer {
 	
 	private void addData() {
 		// Read file
-	      String csvFile = "C:\\addb\\project\\data\\GOOG.csv";
+	      String csvFile = "/backend/data/styles.csv";
 	      String line = "";
 	      String csvSplitter = ",";
 	      
 	      boolean isFirstLine = true;
 	      
 	      try(BufferedReader reader = new BufferedReader(new FileReader(csvFile)); 
-	    		  HTable table = new HTable(conf, "GOOGLE")) {
+	    		  Table table = DatabaseConfig.CONN().getTable(TableName.valueOf("PRODUCTS"))) {
 	    	 while ((line = reader.readLine()) != null) {
 	    		 if (isFirstLine) {
 	    			 isFirstLine = false;
 	    			 continue;
 	    		 }
 	    		 String[] data = line.split(csvSplitter);
-	    		 String date = data[0];
-	    		 double open = Double.parseDouble(data[1]);
-	    		 double high = Double.parseDouble(data[2]);
-	    		 double low = Double.parseDouble(data[3]);
-	    		 double close = Double.parseDouble(data[4]);
-	    		 double adjClose = Double.parseDouble(data[5]);
-	    		 double volume = Double.parseDouble(data[6]);
+	    		 String id = data[0];
+	    		 String gender = data[1];
+	    		 String masterCategory = data[2];
+	    		 String subCategory = data[3];
+	    		 String articleType = data[4];
+	    		 String baseColour = data[5];
+	    		 String season = data[6];
+	    		 int year = Integer.parseInt(data[7]);
+	    		 String usage = data[8];
+	    		 String productDisplayName = data[9];
 	    		 
-	    		 Put put = new Put(Bytes.toBytes(date));
+	    		 Put put = new Put(Bytes.toBytes(id));
 	    		 
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "open".getBytes(), Bytes.toBytes(open));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "high".getBytes(), Bytes.toBytes(high));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "low".getBytes(), Bytes.toBytes(low));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "close".getBytes(), Bytes.toBytes(close));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "adjClose".getBytes(), Bytes.toBytes(adjClose));
-	    		 put.addColumn("STOCK_PRICES".getBytes(), "volume".getBytes(), Bytes.toBytes(volume));
+	    		 put.addColumn("ID".getBytes(), "gender".getBytes(), Bytes.toBytes(gender));
+	    		 put.addColumn("ID".getBytes(), "masterCategory".getBytes(), Bytes.toBytes(masterCategory));
+	    		 put.addColumn("ID".getBytes(), "subCategory".getBytes(), Bytes.toBytes(subCategory));
+	    		 put.addColumn("ID".getBytes(), "articleType".getBytes(), Bytes.toBytes(articleType));
+	    		 put.addColumn("ID".getBytes(), "baseColour".getBytes(), Bytes.toBytes(baseColour));
+	    		 put.addColumn("ID".getBytes(), "season".getBytes(), Bytes.toBytes(season));
+	    		 put.addColumn("ID".getBytes(), "year".getBytes(), Bytes.toBytes(year));
+	    		 put.addColumn("ID".getBytes(), "usage".getBytes(), Bytes.toBytes(usage));
+	    		 put.addColumn("ID".getBytes(), "productDisplayName".getBytes(), Bytes.toBytes(productDisplayName));
 	    		 
 	    		 table.put(put);
 	    	 }

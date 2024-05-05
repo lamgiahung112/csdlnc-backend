@@ -14,6 +14,6 @@ public class DatabaseConfigRunner implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws Exception {
-		initializer.init();
+//		initializer.init();
 	}
 }

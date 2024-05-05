@@ -3,6 +3,8 @@ package addb.project;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -16,8 +18,11 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import addb.project.model.StockSnapshot;
-import addb.project.model.request.GetStocksRequest;
+import com.google.gson.Gson;
+
+import addb.project.model.Product;
+import addb.project.model.request.GetProductRequest;
+import addb.project.model.request.UpdateProductRequest;
 
 @RestController
 @CrossOrigin
@@ -27,12 +32,13 @@ public class Controller {
 	private DataService dataService;
 	
 	@GetMapping
-	public List<StockSnapshot> getSnapshots(@ModelAttribute @RequestAttribute GetStocksRequest request) {
+	public List<Product> getSnapshots(@ModelAttribute @RequestAttribute GetProductRequest request) {
 		return dataService.getSnapshots(request);
 	}
 	
-	@PostMapping("/csv")
-	public void uploadCSV(@RequestPart("file") MultipartFile file) {
-		dataService.readAndAddSnapshotsFromFile(file);
+	@PostMapping(value = "/update")
+	public void updateProduct(@Nullable @RequestPart(name = "file", required = false) MultipartFile file, @RequestParam("metadata") String request) {
+		UpdateProductRequest parsedRequest = new Gson().fromJson(request, UpdateProductRequest.class);
+		dataService.handleUpdateProduct(file, parsedRequest);
 	}
 }
